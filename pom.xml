@@ -53,7 +53,7 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>cn.xukai.hadoop.MRDemo</mainClass>
+              <mainClass>cn.xukai.hadoop.secondOrder.SecondarySort</mainClass>
             </manifest>
           </archive>
           <descriptorRefs>
