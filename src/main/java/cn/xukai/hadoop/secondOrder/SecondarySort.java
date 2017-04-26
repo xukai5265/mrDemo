@@ -1,6 +1,5 @@
 package cn.xukai.hadoop.secondOrder;
 
-import cn.xukai.hadoop.MRDemo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -20,7 +19,10 @@ import java.io.IOException;
 import java.util.StringTokenizer;
 
 /**
+ * 本分参照： http://www.cnblogs.com/codeOfLife/p/5568786.html
+ *  理解排序和分组： http://www.cnblogs.com/edisonchou/p/4299085.html
  * Created by xukai on 2017/4/26.
+ * 输入文件 sort.txt 内容为
  *   40 20
      40 10
      40 30
@@ -33,6 +35,26 @@ import java.util.StringTokenizer;
      50 50
      50 10
      50 60
+ 输出文件的内容（从小到大排序）如下
+     30 10
+     30 20
+     30 30
+     30 40
+     --------
+     40 5
+     40 10
+     40 20
+     40 30
+     --------
+     50 10
+     50 20
+     50 50
+     50 60
+
+ 实现原理
+    1. 将文本中的两个字段封装为一个对象（IntPair）中的两个属性。该对象实现 WritableComparable 接口并重写其方法
+    2. map 阶段负责将 封装 这样的输出格式 IntPair,value
+    3.
  */
 public class SecondarySort extends Configured implements Tool {
     @Override
@@ -83,6 +105,7 @@ public class SecondarySort extends Configured implements Tool {
     public static class Map extends Mapper<LongWritable, Text, IntPair, IntWritable> {
         @Override
         protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+            System.out.println("map is start....");
             StringTokenizer tokenizer = new StringTokenizer(value.toString());
             int left = 0;
             int right = 0;
@@ -97,20 +120,29 @@ public class SecondarySort extends Configured implements Tool {
                 }
                 context.write(new IntPair(left, right), new IntWritable(right));
             }
+            System.out.println("map is over....");
         }
     }
 
     /*
+       是key的第一次比较，完成对所有key的排序。
      * 自定义分区函数类FirstPartitioner，根据 IntPair中的first实现分区
+     *
      */
     public static class FirstPartitioner extends Partitioner<IntPair, IntWritable> {
         @Override
         public int getPartition(IntPair key, IntWritable value,int numPartitions){
-            return Math.abs(key.getFirst() * 127) % numPartitions;
+            System.out.println("FirstPartitioner is start...");
+            System.out.println("first : "+key.getFirst());
+            System.out.println("numPartitions="+numPartitions);
+            int res = Math.abs(key.getFirst() * 127) % numPartitions;
+            System.out.println("FirstPartitioner is over...");
+            return res;
         }
     }
 
     /*
+       是key的第二次比较，对所有的key进行排序。
      * 自定义GroupingComparator类，实现分区内的数据分组
      */
     public static class GroupingComparator extends WritableComparator {
@@ -120,20 +152,27 @@ public class SecondarySort extends Configured implements Tool {
 
         @Override
         public int compare(WritableComparable w1, WritableComparable w2){
+            System.out.println("GroupingComparator is start ...");
             IntPair ip1 = (IntPair) w1;
             IntPair ip2 = (IntPair) w2;
             int l = ip1.getFirst();
             int r = ip2.getFirst();
-            return l == r ? 0 : (l < r ? -1 : 1);
+            int res = l == r ? 0 : (l < r ? -1 : 1);
+            System.out.println("l="+l + "r="+r + "res="+ res );
+            System.out.println("GroupingComparator is over ...");
+            return res;
         }
     }
 
     public static class Reduce extends Reducer<IntPair, IntWritable, Text, IntWritable> {
 
         public void reduce(IntPair key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+            System.out.println("reduce is start ....");
             for (IntWritable val : values) {
+                System.out.println("key= "+ key.getFirst() + " ---"+val);
                 context.write(new Text(Integer.toString(key.getFirst())), val);
             }
+            System.out.println("reduce is over ....");
         }
     }
 }
